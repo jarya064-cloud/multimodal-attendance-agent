@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attendance &amp; Engagement Agent</title>
+<style>
+  body { font-family: Segoe UI, Arial, sans-serif; margin: 0; background: #f3f4f6; color: #111827; }
+  header { background: #1f2937; color: #fff; padding: 12px 20px; }
+  main { padding: 16px 20px; max-width: 1100px; margin: 0 auto; }
+  .notice { background: #fef3c7; border: 1px solid #f59e0b; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .card { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.15); flex: 1 1 340px; margin-bottom: 14px; }
+  img#video { width: 100%; border-radius: 6px; background: #000; }
+  #score { font-size: 56px; font-weight: bold; }
+  .High { color: #15803d; } .Medium { color: #b45309; } .Low { color: #b91c1c; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+  .small { color: #6b7280; font-size: 13px; }
+  .err { color: #b91c1c; }
+  button { background: #b91c1c; color: #fff; border: 0; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+<header><h1 style="margin:0;font-size:20px">Multimodal Attendance &amp; Engagement Agent</h1></header>
+<main>
+  <div class="notice"><b>Consent notice:</b> Video and audio are processed locally and not stored.
+  Only attendance, engagement scores and suggestions are saved as CSV files on this computer.</div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Live camera</h2>
+      <img id="video" src="/video_feed" alt="Live video stream">
+      <div class="small" id="mode"></div>
+      <div class="small err" id="error"></div>
+    </div>
+    <div class="card">
+      <h2>Engagement (last 10 s window)</h2>
+      <div id="score">--</div>
+      <div id="label" style="font-size:22px">Waiting for first window...</div>
+      <div class="small" id="detail"></div>
+      <h2>Suggestions</h2>
+      <ul id="suggestions"><li class="small">No suggestions yet.</li></ul>
+      <div class="small">Suggestions are advice only.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Attendance</h2>
+    <table>
+      <thead><tr><th>Person ID</th><th>First seen</th><th>Marked present at</th></tr></thead>
+      <tbody id="attendance"><tr><td colspan="3" class="small">Nobody marked present yet.</td></tr></tbody>
+    </table>
+  </div>
+
+  <button id="del">Delete all data</button>
+  <span class="small"> Auto-refreshes every 5 seconds.</span>
+</main>
+
+<script>
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c];
+  });
+}
+
+async function refresh() {
+  try {
+    var r = await fetch("/api/status");
+    var d = await r.json();
+
+    document.getElementById("mode").textContent = "Mode: " + d.mode + (d.audio_note ? " | " + d.audio_note : "");
+    document.getElementById("error").textContent = d.error || "";
+
+    var e = d.engagement;
+    var scoreEl = document.getElementById("score");
+    var labelEl = document.getElementById("label");
+    if (e) {
+      scoreEl.textContent = Math.round(e.engagement);
+      scoreEl.className = e.label;
+      labelEl.textContent = e.label + " engagement";
+      labelEl.className = e.label;
+      document.getElementById("detail").textContent =
+        "face " + e.face_score + " | movement " + e.movement_score +
+        " | audio " + e.audio_score + " | at " + e.window_end;
+    } else {
+      scoreEl.textContent = "--";
+      scoreEl.className = "";
+      labelEl.textContent = "Waiting for first window...";
+      labelEl.className = "";
+      document.getElementById("detail").textContent = "";
+    }
+
+    var sug = d.suggestions.slice().reverse();
+    document.getElementById("suggestions").innerHTML = sug.length
+      ? sug.map(function (s) { return "<li>" + esc(s.suggestion) + " <span class=\"small\">(" + esc(s.created_at) + ")</span></li>"; }).join("")
+      : "<li class=\"small\">No suggestions yet.</li>";
+
+    document.getElementById("attendance").innerHTML = d.attendance.length
+      ? d.attendance.map(function (a) {
+          return "<tr><td>" + esc(a.person_id) + "</td><td>" + esc(a.first_seen) +
+                 "</td><td>" + esc(a.marked_present_at) + "</td></tr>";
+        }).join("")
+      : "<tr><td colspan=\"3\" class=\"small\">Nobody marked present yet.</td></tr>";
+  } catch (err) {
+    document.getElementById("error").textContent = "Dashboard cannot reach the server.";
+  }
+}
+
+document.getElementById("del").addEventListener("click", async function () {
+  if (!confirm("Delete all attendance, engagement and suggestion data?")) { return; }
+  try { await fetch("/api/delete", { method: "POST" }); } catch (err) {}
+  refresh();
+});
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
