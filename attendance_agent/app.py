@@ -258,11 +258,9 @@ def main() -> None:
     parser.add_argument("--present-seconds", type=float,
                         default=config.PRESENT_SECONDS,
                         help="seconds a face must be seen to be marked Present")
-  pparser.add_argument("--host", default="0.0.0.0")
-
-    parser.add_argument("--port", type=int, default=5000)
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "5000")))
     args = parser.parse_args()
-
     config.ensure_data_dir()
     thread = threading.Thread(target=worker, args=(args,), daemon=True)
     thread.start()
