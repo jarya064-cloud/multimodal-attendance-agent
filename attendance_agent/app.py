@@ -258,7 +258,8 @@ def main() -> None:
     parser.add_argument("--present-seconds", type=float,
                         default=config.PRESENT_SECONDS,
                         help="seconds a face must be seen to be marked Present")
-    parser.add_argument("--host", default="127.0.0.1")
+  pparser.add_argument("--host", default="0.0.0.0")
+
     parser.add_argument("--port", type=int, default=5000)
     args = parser.parse_args()
 
